@@ -1,4 +1,4 @@
-from prefect.environments.storage import Docker
+from prefect.environments.storage import GitHub
 from prefect import Flow, task
 import pandas as pd
 
@@ -54,9 +54,7 @@ def load(y):
 
 
 with Flow("basic-prefect-etl-flow",
-          storage=Docker(registry_url="<YOUR_ECR_REGISTRY_ID>.dkr.ecr.eu-central-1.amazonaws.com",
-                         python_dependencies=["pandas==1.1.0"],
-                         image_tag='latest')) as flow:
+          storage=GitHub("TomAugspurger/prefect-demo", path="basic-flow.py")) as flow:
     extracted_df = extract()
     transformed_df = transform(extracted_df)
     load(transformed_df)
