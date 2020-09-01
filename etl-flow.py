@@ -53,7 +53,7 @@ def load(y):
     print(f"ETL finished. Old scores: {old}. New scores: {new}")
 
 
-with Flow("basic-prefect-etl-flow",
+with Flow("etl-flow",
           storage=Docker("tomaugspurger", python_dependencies=["pandas==1.1.0"], image_tag="latest")) as flow:
     extracted_df = extract()
     transformed_df = transform(extracted_df)
@@ -61,4 +61,4 @@ with Flow("basic-prefect-etl-flow",
 
 
 if __name__ == '__main__':
-    flow.register(project_name='Hello, World!')
+    flow.register(project_name='pangeo-forge')
