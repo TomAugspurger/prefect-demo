@@ -16,7 +16,7 @@ rolebinding.rbac.authorization.k8s.io/prefect-agent-rbac unchanged
 3. Install prefect agent
 
 ```console
-$ prefect agent install kubernetes -t <TOKEN> --rbac --namespace=staging | kubectl apply -n staging -f -
+$ prefect agent install kubernetes -t <TOKEN> --rbac --namespace=staging --image-pull-policy=Always | kubectl apply -n staging -f -
 deloyment.apps/prefect-agent configured
 role.rbac.authorization.k8s.io/prefect-agent-rbac created
 rolebinding.rbac.authorization.k8s.io/prefect-agent-rbac created
