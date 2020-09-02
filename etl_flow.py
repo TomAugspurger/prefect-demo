@@ -2,13 +2,9 @@ import os
 import urllib.parse
 
 from prefect.environments.storage import Docker
-from prefect.environments import LocalEnvironment
-from prefect.engine.executors import DaskExecutor
+from prefect.environments import DaskKubernetesEnvironment
 from prefect import Flow, task
 import pandas as pd
-from dask_gateway import Gateway
-from dask_gateway.auth import JupyterHubAuth
-from dask_gateway.client import GatewaySecurity
 
 
 def score_check(grade, subject, student):
@@ -22,7 +18,9 @@ def score_check(grade, subject, student):
     """
     if pd.notnull(subject) and grade > 90:
         new_grade = grade * 2
-        print(f'Doubled score: {new_grade}, Subject: {subject}, Student name: {student}')
+        print(
+            f"Doubled score: {new_grade}, Subject: {subject}, Student name: {student}"
+        )
         return new_grade
     else:
         return grade
@@ -31,16 +29,44 @@ def score_check(grade, subject, student):
 @task
 def extract():
     """ Return a dataframe with students and their grades"""
-    data = {'Name': ['Hermione', 'Hermione', 'Hermione', 'Hermione', 'Hermione',
-                     'Ron', 'Ron', 'Ron', 'Ron', 'Ron',
-                     'Harry', 'Harry', 'Harry', 'Harry', 'Harry'],
-            'Age': [12] * 15,
-            'Subject': ['History of Magic', 'Dark Arts', 'Potions', 'Flying', None,
-                        'History of Magic', 'Dark Arts', 'Potions', 'Flying', None,
-                        'History of Magic', 'Dark Arts', 'Potions', 'Flying', None],
-            'Score': [100, 100, 100, 68, 99,
-                      45, 53, 39, 87, 99,
-                      67, 86, 37, 100, 99]}
+    data = {
+        "Name": [
+            "Hermione",
+            "Hermione",
+            "Hermione",
+            "Hermione",
+            "Hermione",
+            "Ron",
+            "Ron",
+            "Ron",
+            "Ron",
+            "Ron",
+            "Harry",
+            "Harry",
+            "Harry",
+            "Harry",
+            "Harry",
+        ],
+        "Age": [12] * 15,
+        "Subject": [
+            "History of Magic",
+            "Dark Arts",
+            "Potions",
+            "Flying",
+            None,
+            "History of Magic",
+            "Dark Arts",
+            "Potions",
+            "Flying",
+            None,
+            "History of Magic",
+            "Dark Arts",
+            "Potions",
+            "Flying",
+            None,
+        ],
+        "Score": [100, 100, 100, 68, 99, 45, 53, 39, 87, 99, 67, 86, 37, 100, 99],
+    }
 
     df = pd.DataFrame(data)
     return df
@@ -48,9 +74,12 @@ def extract():
 
 @task(log_stdout=True)
 def transform(x):
-    x["New_Score"] = x.apply(lambda row: score_check(grade=row['Score'],
-                                                     subject=row['Subject'],
-                                                     student=row['Name']), axis=1)
+    x["New_Score"] = x.apply(
+        lambda row: score_check(
+            grade=row["Score"], subject=row["Subject"], student=row["Name"]
+        ),
+        axis=1,
+    )
     return x
 
 
@@ -61,38 +90,25 @@ def load(y):
     print(f"ETL finished. Old scores: {old}. New scores: {new}")
 
 
-def get_executor():
-    print("Creating executor")
-    auth = JupyterHubAuth(os.environ["PANGEO_TOKEN"])
-    # external
-    gateway = Gateway(
-        address="https://staging.us-central1-b.gcp.pangeo.io/services/dask-gateway/",
-        auth=auth
-    )
-    cluster = gateway.new_cluster(shutdown_on_close=False)
-    print(cluster.dashboard_link)
-    cluster.adapt(0, 10)
-
-    # Running on the cluster, use the internal address.
-    parsed = urllib.parse.urlparse(cluster.scheduler_address)
-    scheduler_address = urllib.parse.urlunparse(
-        parsed._replace(netloc="traefik-gcp-uscentral1b-staging-dask-gateway.staging:80")
-    )
-    print(scheduler_address)
-
-    executor = DaskExecutor(
-        address=scheduler_address,
-        client_kwargs={"security": cluster.security}
-    )
-    return executor
-
-
-with Flow("etl-flow",
-          storage=Docker("tomaugspurger", python_dependencies=["pandas==1.1.0", "dask_gateway", "dask==2.25.0", "distributed==2.25.0"], image_tag="latest")) as flow:
+flow = Flow(
+    "etl-flow",
+    storage=Docker(
+        "tomaugspurger",
+        python_dependencies=[
+            "pandas==1.1.0",
+            "dask_gateway",
+            "dask==2.25.0",
+            "distributed==2.25.0",
+        ],
+        image_tag="latest",
+    ),
+    environment=DaskKubernetesEnvironment(min_workers=1, max_workers=3),
+)
+with flow:
     extracted_df = extract()
     transformed_df = transform(extracted_df)
     load(transformed_df)
 
 
-if __name__ == '__main__':
-    flow.register(project_name='pangeo-forge')
+if __name__ == "__main__":
+    flow.register(project_name="pangeo-forge")
