@@ -96,7 +96,7 @@ flow = Flow(
         "tomaugspurger",
         python_dependencies=[
             "pandas==1.1.0",
-            "dask_gateway",
+            "dask-kubernetes",
             "dask==2.25.0",
             "distributed==2.25.0",
         ],
